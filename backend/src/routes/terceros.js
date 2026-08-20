@@ -11,7 +11,7 @@ router.get('/', (req, res) => {
   const { tipo, q } = req.query;
   let sql = 'SELECT * FROM terceros WHERE 1=1';
   const params = [];
-  if (tipo) { sql += ' AND (tipo = ? OR tipo = "AMBOS")'; params.push(tipo); }
+  if (tipo) { sql += " AND (tipo = ? OR tipo = 'AMBOS')"; params.push(tipo); } 
   if (q) { sql += ' AND (razon_social LIKE ? OR nit_rut LIKE ?)'; params.push(`%${q}%`, `%${q}%`); }
   sql += ' ORDER BY razon_social';
   res.json(db.prepare(sql).all(...params));
