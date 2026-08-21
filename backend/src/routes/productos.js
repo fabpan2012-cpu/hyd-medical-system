@@ -41,4 +41,26 @@ router.post('/', authorize('COMPRAS', 'CONTABILIDAD'), (req, res) => {
   }
 });
 
+router.put('/:id', authorize('COMPRAS', 'CONTABILIDAD'), (req, res) => {
+  const b = req.body;
+  const antes = db.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
+  if (!antes) return res.status(404).json({ error: 'Producto no encontrado.' });
+  if (!b.codigo || !b.nombre) return res.status(400).json({ error: 'Código y nombre son requeridos.' });
+  try {
+    db.prepare(`
+      UPDATE productos SET codigo = ?, nombre = ?, descripcion = ?, iva_tipo = ?, iva_porcentaje = ?,
+        precio_venta_sugerido = ?, requiere_registro_sanitario = ?
+      WHERE id = ?
+    `).run(
+      b.codigo, b.nombre, b.descripcion || null, b.iva_tipo || 'GRAVADO', b.iva_porcentaje ?? 19,
+      b.precio_venta_sugerido || 0, b.requiere_registro_sanitario === false ? 0 : 1, req.params.id
+    );
+    const despues = db.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
+    logAudit(req, { accion: 'UPDATE', entidad: 'PRODUCTO', entidad_id: req.params.id, descripcion: `Producto editado: ${b.nombre}`, antes, despues });
+    res.json(despues);
+  } catch (e) {
+    res.status(400).json({ error: 'El código de producto ya existe.' });
+  }
+});
+
 module.exports = router;
