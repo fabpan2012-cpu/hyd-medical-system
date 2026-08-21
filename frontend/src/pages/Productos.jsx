@@ -9,17 +9,37 @@ export default function Productos() {
   const [items, setItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(empty);
+  const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
 
   function load() { api.get('/productos').then(setItems).catch((e) => setError(e.message)); }
   useEffect(load, []);
 
+  function startEdit(p) {
+    setEditingId(p.id);
+    setForm({
+      codigo: p.codigo, nombre: p.nombre, descripcion: p.descripcion || '',
+      iva_tipo: p.iva_tipo, iva_porcentaje: p.iva_porcentaje,
+      precio_venta_sugerido: p.precio_venta_sugerido, requiere_registro_sanitario: !!p.requiere_registro_sanitario,
+    });
+    setShowForm(true);
+  }
+
+  function cancelForm() {
+    setShowForm(false); setEditingId(null); setForm(empty);
+  }
+
   async function submit(e) {
     e.preventDefault();
     setError('');
     try {
-      await api.post('/productos', { ...form, precio_venta_sugerido: Number(form.precio_venta_sugerido) || 0 });
-      setForm(empty); setShowForm(false); load();
+      const payload = { ...form, precio_venta_sugerido: Number(form.precio_venta_sugerido) || 0 };
+      if (editingId) {
+        await api.put(`/productos/${editingId}`, payload);
+      } else {
+        await api.post('/productos', payload);
+      }
+      setForm(empty); setEditingId(null); setShowForm(false); load();
     } catch (err) { setError(err.message); }
   }
 
@@ -31,7 +51,9 @@ export default function Productos() {
           <p className="text-slate-500 text-sm">Catálogo base para compras y ventas</p>
         </div>
         {hasRole('COMPRAS', 'CONTABILIDAD') && (
-          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancelar' : '+ Nuevo Producto'}</button>
+          <button className="btn btn-primary" onClick={() => (showForm ? cancelForm() : setShowForm(true))}>
+            {showForm ? 'Cancelar' : '+ Nuevo Producto'}
+          </button>
         )}
       </div>
 
@@ -55,13 +77,15 @@ export default function Productos() {
             <input type="checkbox" checked={form.requiere_registro_sanitario} onChange={(e) => setForm({ ...form, requiere_registro_sanitario: e.target.checked })} />
             Requiere Registro Sanitario
           </label>
-          <div className="md:col-span-3"><button className="btn btn-primary">Guardar Producto</button></div>
+          <div className="md:col-span-3">
+            <button className="btn btn-primary">{editingId ? 'Guardar Cambios' : 'Guardar Producto'}</button>
+          </div>
         </form>
       )}
 
       <div className="card overflow-x-auto">
         <table className="data-table">
-          <thead><tr><th>Código</th><th>Nombre</th><th>IVA</th><th>Precio Sugerido</th><th>Reg. Sanitario</th></tr></thead>
+          <thead><tr><th>Código</th><th>Nombre</th><th>IVA</th><th>Precio Sugerido</th><th>Reg. Sanitario</th><th></th></tr></thead>
           <tbody>
             {items.map((p) => (
               <tr key={p.id}>
@@ -70,6 +94,11 @@ export default function Productos() {
                 <td>{p.iva_tipo} {p.iva_porcentaje ? `(${p.iva_porcentaje}%)` : ''}</td>
                 <td>${Number(p.precio_venta_sugerido).toLocaleString('es-CO')}</td>
                 <td>{p.requiere_registro_sanitario ? <span className="badge badge-yellow">Requerido</span> : <span className="badge badge-gray">No aplica</span>}</td>
+                <td>
+                  {hasRole('COMPRAS', 'CONTABILIDAD') && (
+                    <button className="btn btn-secondary btn-sm" onClick={() => startEdit(p)}>Editar</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
